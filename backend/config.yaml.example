@@ -1,0 +1,34 @@
+server:
+  port: "8080"
+  host: "0.0.0.0"
+
+database:
+  host: localhost
+  port: 5432
+  name: optics
+  user: optics
+  # password should be set via environment variable OPTICS_DATABASE_PASSWORD
+  sslmode: disable
+
+jwt:
+  # secret should be set via environment variable OPTICS_JWT_SECRET
+  expiry: "24h"
+
+storage:
+  mount_path: "/mnt/3d-models"      # Path where 3D models are mounted
+  thumbnail_path: "/data/thumbnails" # Path to store generated thumbnails
+
+scanning:
+  extensions:
+    - stl
+    - scad
+    - obj
+    - 3mf
+    - step
+    - stp
+  ignore_patterns:
+    - "System Volume Information"
+    - "*.tmp"
+    - ".DS_Store"
+    - "Thumbs.db"
+  batch_size: 100

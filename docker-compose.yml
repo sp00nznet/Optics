@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: optics-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-optics}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-optics}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-optics} -d ${DB_NAME:-optics}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: optics-backend
+    restart: unless-stopped
+    environment:
+      OPTICS_SERVER_PORT: "8080"
+      OPTICS_SERVER_HOST: "0.0.0.0"
+      OPTICS_DATABASE_HOST: postgres
+      OPTICS_DATABASE_PORT: "5432"
+      OPTICS_DATABASE_NAME: ${DB_NAME:-optics}
+      OPTICS_DATABASE_USER: ${DB_USER:-optics}
+      OPTICS_DATABASE_PASSWORD: ${DB_PASSWORD}
+      OPTICS_DATABASE_SSLMODE: disable
+      OPTICS_JWT_SECRET: ${JWT_SECRET}
+      OPTICS_JWT_EXPIRY: "24h"
+      OPTICS_STORAGE_MOUNT_PATH: /mnt/3d-models
+      OPTICS_STORAGE_THUMBNAIL_PATH: /data/thumbnails
+    volumes:
+      - ./models:/mnt/3d-models:ro
+      - thumbnails_data:/data/thumbnails
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        API_URL: ${API_URL:-http://localhost:8080}
+    container_name: optics-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3333}:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  thumbnails_data:
