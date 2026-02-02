@@ -6,15 +6,15 @@ WORKDIR /app
 # Install dependencies
 RUN apk add --no-cache git
 
-# Copy go mod file and download dependencies
-COPY go.mod ./
-RUN go mod download || true
+# Set GOPRIVATE to prevent Go from trying to fetch internal packages
+ENV GOPRIVATE=github.com/optics/*
+ENV GOFLAGS="-mod=mod"
 
-# Copy source code
+# Copy all source code
 COPY . .
 
-# Tidy and download dependencies
-RUN go mod tidy && go mod download
+# Download external dependencies and generate go.sum
+RUN go mod tidy
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server ./cmd/server
