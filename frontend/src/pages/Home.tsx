@@ -65,7 +65,7 @@ export default function Home() {
           </Link>
         </div>
         <ModelGrid
-          models={recentModels?.data.models || []}
+          models={(recentModels?.data.models || []).filter(m => !['scad', 'dat'].includes(m.file_type.toLowerCase()))}
           loading={modelsLoading}
         />
       </section>

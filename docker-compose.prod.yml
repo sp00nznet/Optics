@@ -1,0 +1,7 @@
+services:
+  backend:
+    environment:
+      OPTICS_STORAGE_MOUNT_PATH: /mnt/3d-models
+    volumes:
+      - /mnt/pool:/mnt/3d-models:ro
+      - thumbnails_data:/data/thumbnails

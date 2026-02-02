@@ -54,10 +54,15 @@ func (h *ModelHandler) List(c *gin.Context) {
 	var args []interface{}
 	argNum := 1
 
-	if filter.CategoryID != nil {
+	if filter.Category != nil && *filter.Category != "" {
+		categoryID, err := uuid.Parse(*filter.Category)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category ID"})
+			return
+		}
 		query += fmt.Sprintf(" AND m.category_id = $%d", argNum)
 		countQuery += fmt.Sprintf(" AND m.category_id = $%d", argNum)
-		args = append(args, *filter.CategoryID)
+		args = append(args, categoryID)
 		argNum++
 	}
 

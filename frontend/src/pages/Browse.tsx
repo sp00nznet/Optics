@@ -167,8 +167,11 @@ export default function Browse() {
           </div>
         )}
 
-        {/* Grid */}
-        <ModelGrid models={modelsData?.data.models || []} loading={isLoading} />
+        {/* Grid - filter out SCAD and DAT files */}
+        <ModelGrid
+          models={(modelsData?.data.models || []).filter(m => !['scad', 'dat'].includes(m.file_type.toLowerCase()))}
+          loading={isLoading}
+        />
 
         {/* Pagination */}
         {modelsData?.data && modelsData.data.total_pages > 1 && (
