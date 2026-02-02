@@ -13,8 +13,10 @@ export default function ModelThumbnail({ modelUrl, fileType, className = '' }: M
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
+  const isSTL = fileType?.toLowerCase() === 'stl'
+
   useEffect(() => {
-    if (fileType.toLowerCase() !== 'stl') {
+    if (!isSTL) {
       setLoading(false)
       return
     }
@@ -33,7 +35,7 @@ export default function ModelThumbnail({ modelUrl, fileType, className = '' }: M
   }, [modelUrl, fileType])
 
   // For non-STL files, show a placeholder
-  if (fileType.toLowerCase() !== 'stl') {
+  if (!isSTL) {
     return (
       <div className={`bg-gray-700 flex items-center justify-center ${className}`}>
         <div className="text-center text-gray-400">

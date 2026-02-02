@@ -99,6 +99,25 @@ class ThumbnailService {
     this.processing = false
   }
 
+  private clearMeshes() {
+    if (!this.scene) return
+    const toRemove: THREE.Object3D[] = []
+    this.scene.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        toRemove.push(child)
+      }
+    })
+    toRemove.forEach((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        obj.geometry?.dispose()
+        if (obj.material instanceof THREE.Material) {
+          obj.material.dispose()
+        }
+      }
+      this.scene!.remove(obj)
+    })
+  }
+
   private renderThumbnail(url: string): Promise<string | null> {
     return new Promise((resolve) => {
       if (!this.renderer || !this.scene || !this.camera) {
@@ -106,18 +125,13 @@ class ThumbnailService {
         return
       }
 
+      // Clear previous mesh BEFORE loading new one
+      this.clearMeshes()
+
       const loader = new STLLoader()
       loader.load(
         url,
         (geometry) => {
-          // Clear previous mesh
-          const toRemove: THREE.Object3D[] = []
-          this.scene!.traverse((child) => {
-            if (child instanceof THREE.Mesh) {
-              toRemove.push(child)
-            }
-          })
-          toRemove.forEach((obj) => this.scene!.remove(obj))
 
           // Process geometry
           geometry.computeVertexNormals()
