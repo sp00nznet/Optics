@@ -104,13 +104,21 @@ export interface DuplicateGroup {
   models: Model[]
 }
 
+export interface SkipReasons {
+  wrong_extension: number
+  already_indexed: number
+  extension_counts: Record<string, number>
+}
+
 export interface ScanStatus {
   running: boolean
   started_at?: string
   files_scanned: number
   files_indexed: number
   files_skipped: number
+  skip_reasons?: SkipReasons
   errors: number
+  error_log?: string[]
   current_path?: string
   last_error?: string
   completed_at?: string

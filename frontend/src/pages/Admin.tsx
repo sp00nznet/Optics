@@ -776,6 +776,38 @@ function ScanStatusDisplay({ status }: { status: ScanStatus }) {
         </div>
       </div>
 
+      {/* Skip reasons breakdown */}
+      {status.skip_reasons && status.files_skipped > 0 && (
+        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded space-y-3">
+          <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300">Why files were skipped:</h4>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Wrong extension:</span>
+              <span className="font-medium">{status.skip_reasons.wrong_extension?.toLocaleString() || 0}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">Already indexed:</span>
+              <span className="font-medium">{status.skip_reasons.already_indexed?.toLocaleString() || 0}</span>
+            </div>
+          </div>
+          {status.skip_reasons.extension_counts && Object.keys(status.skip_reasons.extension_counts).length > 0 && (
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Skipped extensions (top 10):</p>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(status.skip_reasons.extension_counts)
+                  .sort(([, a], [, b]) => b - a)
+                  .slice(0, 10)
+                  .map(([ext, count]) => (
+                    <span key={ext} className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded text-xs">
+                      {ext}: {count.toLocaleString()}
+                    </span>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Current path */}
       {status.running && status.current_path && (
         <div className="text-sm">
@@ -786,11 +818,19 @@ function ScanStatusDisplay({ status }: { status: ScanStatus }) {
         </div>
       )}
 
-      {/* Last error */}
-      {status.last_error && (
+      {/* Error log */}
+      {status.error_log && status.error_log.length > 0 && (
         <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm">
-          <p className="text-red-700 dark:text-red-300 font-medium">Last Error:</p>
-          <p className="text-red-600 dark:text-red-400">{status.last_error}</p>
+          <p className="text-red-700 dark:text-red-300 font-medium mb-2">
+            Errors ({status.errors} total, showing last {Math.min(status.error_log.length, 100)}):
+          </p>
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {status.error_log.map((err, i) => (
+              <p key={i} className="text-red-600 dark:text-red-400 text-xs font-mono truncate" title={err}>
+                {err}
+              </p>
+            ))}
+          </div>
         </div>
       )}
 

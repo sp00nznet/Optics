@@ -19,16 +19,24 @@ import (
 	"github.com/optics/backend/internal/config"
 )
 
+type SkipReasons struct {
+	WrongExtension  int            `json:"wrong_extension"`
+	AlreadyIndexed  int            `json:"already_indexed"`
+	ExtensionCounts map[string]int `json:"extension_counts"` // count by extension
+}
+
 type ScanStatus struct {
-	Running       bool      `json:"running"`
-	StartedAt     time.Time `json:"started_at,omitempty"`
-	FilesScanned  int       `json:"files_scanned"`
-	FilesIndexed  int       `json:"files_indexed"`
-	FilesSkipped  int       `json:"files_skipped"`
-	Errors        int       `json:"errors"`
-	CurrentPath   string    `json:"current_path,omitempty"`
-	LastError     string    `json:"last_error,omitempty"`
-	CompletedAt   time.Time `json:"completed_at,omitempty"`
+	Running       bool        `json:"running"`
+	StartedAt     time.Time   `json:"started_at,omitempty"`
+	FilesScanned  int         `json:"files_scanned"`
+	FilesIndexed  int         `json:"files_indexed"`
+	FilesSkipped  int         `json:"files_skipped"`
+	SkipReasons   SkipReasons `json:"skip_reasons"`
+	Errors        int         `json:"errors"`
+	ErrorLog      []string    `json:"error_log"`
+	CurrentPath   string      `json:"current_path,omitempty"`
+	LastError     string      `json:"last_error,omitempty"`
+	CompletedAt   time.Time   `json:"completed_at,omitempty"`
 }
 
 type Scanner struct {
@@ -64,6 +72,10 @@ func (s *Scanner) StartMultiple(paths []string) {
 	s.status = ScanStatus{
 		Running:   true,
 		StartedAt: time.Now(),
+		SkipReasons: SkipReasons{
+			ExtensionCounts: make(map[string]int),
+		},
+		ErrorLog: make([]string, 0),
 	}
 	s.stopChan = make(chan struct{})
 	s.categoryCache = make(map[string]uuid.UUID)
@@ -135,6 +147,12 @@ func (s *Scanner) scanPath(rootPath string, extensions map[string]bool) {
 		if !extensions[ext] {
 			s.mu.Lock()
 			s.status.FilesSkipped++
+			s.status.SkipReasons.WrongExtension++
+			if ext != "" {
+				s.status.SkipReasons.ExtensionCounts[ext]++
+			} else {
+				s.status.SkipReasons.ExtensionCounts["(no extension)"]++
+			}
 			s.mu.Unlock()
 			return nil
 		}
@@ -153,6 +171,7 @@ func (s *Scanner) scanPath(rootPath string, extensions map[string]bool) {
 		if err != nil || exists {
 			s.mu.Lock()
 			s.status.FilesSkipped++
+			s.status.SkipReasons.AlreadyIndexed++
 			s.mu.Unlock()
 			return nil
 		}
@@ -247,6 +266,12 @@ func (s *Scanner) scanZipFile(zipPath, rootPath string, extensions map[string]bo
 		if !extensions[ext] {
 			s.mu.Lock()
 			s.status.FilesSkipped++
+			s.status.SkipReasons.WrongExtension++
+			if ext != "" {
+				s.status.SkipReasons.ExtensionCounts[ext]++
+			} else {
+				s.status.SkipReasons.ExtensionCounts["(no extension)"]++
+			}
 			s.mu.Unlock()
 			continue
 		}
@@ -265,6 +290,7 @@ func (s *Scanner) scanZipFile(zipPath, rootPath string, extensions map[string]bo
 		if err != nil || exists {
 			s.mu.Lock()
 			s.status.FilesSkipped++
+			s.status.SkipReasons.AlreadyIndexed++
 			s.mu.Unlock()
 			continue
 		}
@@ -451,6 +477,10 @@ func (s *Scanner) incrementError(msg string) {
 	s.mu.Lock()
 	s.status.Errors++
 	s.status.LastError = msg
+	// Keep last 100 errors
+	if len(s.status.ErrorLog) < 100 {
+		s.status.ErrorLog = append(s.status.ErrorLog, msg)
+	}
 	s.mu.Unlock()
 }
 
