@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -90,16 +93,187 @@ func (h *AdminHandler) UpdateSetting(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Setting updated successfully"})
 }
 
+func (h *AdminHandler) GetModelPaths(c *gin.Context) {
+	ctx := context.Background()
+
+	var pathsJSON string
+	err := h.db.QueryRow(ctx, "SELECT value FROM settings WHERE key = 'model_paths'").Scan(&pathsJSON)
+	if err != nil {
+		// Return default path
+		c.JSON(http.StatusOK, gin.H{"paths": []string{h.cfg.Storage.MountPath}})
+		return
+	}
+
+	// Parse JSON array
+	var paths []string
+	if err := json.Unmarshal([]byte(pathsJSON), &paths); err != nil {
+		c.JSON(http.StatusOK, gin.H{"paths": []string{h.cfg.Storage.MountPath}})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"paths": paths})
+}
+
+func (h *AdminHandler) SetModelPaths(c *gin.Context) {
+	var req struct {
+		Paths []string `json:"paths" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	pathsJSON, _ := json.Marshal(req.Paths)
+
+	ctx := context.Background()
+	_, err := h.db.Exec(ctx, `
+		INSERT INTO settings (key, value, updated_at) VALUES ('model_paths', $1, NOW())
+		ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()
+	`, string(pathsJSON))
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update model paths"})
+		return
+	}
+
+	// Update the config with first path
+	if len(req.Paths) > 0 {
+		h.cfg.Storage.MountPath = req.Paths[0]
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Model paths updated successfully", "paths": req.Paths})
+}
+
+func (h *AdminHandler) AddModelPath(c *gin.Context) {
+	var req struct {
+		Path string `json:"path" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx := context.Background()
+
+	// Get existing paths
+	var pathsJSON string
+	var paths []string
+	err := h.db.QueryRow(ctx, "SELECT value FROM settings WHERE key = 'model_paths'").Scan(&pathsJSON)
+	if err == nil {
+		json.Unmarshal([]byte(pathsJSON), &paths)
+	} else {
+		paths = []string{h.cfg.Storage.MountPath}
+	}
+
+	// Check if path already exists
+	for _, p := range paths {
+		if p == req.Path {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Path already exists"})
+			return
+		}
+	}
+
+	// Add new path
+	paths = append(paths, req.Path)
+	pathsJSON2, _ := json.Marshal(paths)
+
+	_, err = h.db.Exec(ctx, `
+		INSERT INTO settings (key, value, updated_at) VALUES ('model_paths', $1, NOW())
+		ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()
+	`, string(pathsJSON2))
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add path"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Path added", "paths": paths})
+}
+
+func (h *AdminHandler) RemoveModelPath(c *gin.Context) {
+	var req struct {
+		Path string `json:"path" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx := context.Background()
+
+	// Get existing paths
+	var pathsJSON string
+	var paths []string
+	err := h.db.QueryRow(ctx, "SELECT value FROM settings WHERE key = 'model_paths'").Scan(&pathsJSON)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No paths configured"})
+		return
+	}
+	json.Unmarshal([]byte(pathsJSON), &paths)
+
+	// Remove path
+	var newPaths []string
+	for _, p := range paths {
+		if p != req.Path {
+			newPaths = append(newPaths, p)
+		}
+	}
+
+	if len(newPaths) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot remove last path"})
+		return
+	}
+
+	pathsJSON2, _ := json.Marshal(newPaths)
+	h.db.Exec(ctx, `UPDATE settings SET value = $1, updated_at = NOW() WHERE key = 'model_paths'`, string(pathsJSON2))
+
+	c.JSON(http.StatusOK, gin.H{"message": "Path removed", "paths": newPaths})
+}
+
+func (h *AdminHandler) BrowseDirectory(c *gin.Context) {
+	path := c.Query("path")
+	if path == "" {
+		path = "/mnt"
+	}
+
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot read directory: " + err.Error()})
+		return
+	}
+
+	var dirs []gin.H
+	for _, entry := range entries {
+		if entry.IsDir() {
+			dirs = append(dirs, gin.H{
+				"name": entry.Name(),
+				"path": filepath.Join(path, entry.Name()),
+			})
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"current": path,
+		"parent":  filepath.Dir(path),
+		"directories": dirs,
+	})
+}
+
+// Legacy single path support
 func (h *AdminHandler) GetModelPath(c *gin.Context) {
 	ctx := context.Background()
 
-	var path string
-	err := h.db.QueryRow(ctx, "SELECT value FROM settings WHERE key = 'model_path'").Scan(&path)
-	if err != nil {
-		path = h.cfg.Storage.MountPath
+	var pathsJSON string
+	err := h.db.QueryRow(ctx, "SELECT value FROM settings WHERE key = 'model_paths'").Scan(&pathsJSON)
+	if err == nil {
+		var paths []string
+		if json.Unmarshal([]byte(pathsJSON), &paths) == nil && len(paths) > 0 {
+			c.JSON(http.StatusOK, gin.H{"path": paths[0]})
+			return
+		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"path": path})
+	c.JSON(http.StatusOK, gin.H{"path": h.cfg.Storage.MountPath})
 }
 
 func (h *AdminHandler) SetModelPath(c *gin.Context) {
@@ -111,18 +285,20 @@ func (h *AdminHandler) SetModelPath(c *gin.Context) {
 		return
 	}
 
+	paths := []string{req.Path}
+	pathsJSON, _ := json.Marshal(paths)
+
 	ctx := context.Background()
 	_, err := h.db.Exec(ctx, `
-		INSERT INTO settings (key, value, updated_at) VALUES ('model_path', $1, NOW())
+		INSERT INTO settings (key, value, updated_at) VALUES ('model_paths', $1, NOW())
 		ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()
-	`, req.Path)
+	`, string(pathsJSON))
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update model path"})
 		return
 	}
 
-	// Update the config
 	h.cfg.Storage.MountPath = req.Path
 
 	c.JSON(http.StatusOK, gin.H{"message": "Model path updated successfully", "path": req.Path})
@@ -369,16 +545,21 @@ func (h *AdminHandler) ClearModels(c *gin.Context) {
 // Scanner endpoints (moved from files.go)
 
 func (h *AdminHandler) StartScan(c *gin.Context) {
-	// Get current model path from settings
+	// Get all configured paths
 	ctx := context.Background()
-	var path string
-	err := h.db.QueryRow(ctx, "SELECT value FROM settings WHERE key = 'model_path'").Scan(&path)
-	if err == nil && path != "" {
-		h.cfg.Storage.MountPath = path
+	var pathsJSON string
+	var paths []string
+	err := h.db.QueryRow(ctx, "SELECT value FROM settings WHERE key = 'model_paths'").Scan(&pathsJSON)
+	if err == nil {
+		json.Unmarshal([]byte(pathsJSON), &paths)
+	}
+	if len(paths) == 0 {
+		paths = []string{h.cfg.Storage.MountPath}
 	}
 
-	go h.scanner.Start()
-	c.JSON(http.StatusAccepted, gin.H{"message": "Scan started", "status": "running", "path": h.cfg.Storage.MountPath})
+	// Start scan with all paths
+	go h.scanner.StartMultiple(paths)
+	c.JSON(http.StatusAccepted, gin.H{"message": "Scan started", "status": "running", "paths": paths})
 }
 
 func (h *AdminHandler) GetScanStatus(c *gin.Context) {

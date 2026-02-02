@@ -96,6 +96,11 @@ func Setup(
 			admin.PUT("/settings", adminHandler.UpdateSetting)
 			admin.GET("/settings/model-path", adminHandler.GetModelPath)
 			admin.PUT("/settings/model-path", adminHandler.SetModelPath)
+			admin.GET("/settings/model-paths", adminHandler.GetModelPaths)
+			admin.PUT("/settings/model-paths", adminHandler.SetModelPaths)
+			admin.POST("/settings/model-paths/add", adminHandler.AddModelPath)
+			admin.POST("/settings/model-paths/remove", adminHandler.RemoveModelPath)
+			admin.GET("/browse", adminHandler.BrowseDirectory)
 
 			// User management
 			admin.GET("/users", adminHandler.ListUsers)

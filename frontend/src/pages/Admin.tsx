@@ -15,7 +15,6 @@ import {
   FolderOpen,
   UserPlus,
   Edit2,
-  Check,
   X,
   AlertTriangle,
   Database,
@@ -153,23 +152,25 @@ function OverviewTab() {
 
 function SettingsTab() {
   const queryClient = useQueryClient()
-  const [modelPath, setModelPath] = useState('')
-  const [isEditing, setIsEditing] = useState(false)
+  const [showBrowser, setShowBrowser] = useState(false)
 
-  const { data: pathData, isLoading } = useQuery({
-    queryKey: ['admin', 'model-path'],
-    queryFn: async () => {
-      const result = await adminApi.getModelPath()
-      setModelPath(result.data.path)
-      return result
+  const { data: pathsData, isLoading } = useQuery({
+    queryKey: ['admin', 'model-paths'],
+    queryFn: () => adminApi.getModelPaths(),
+  })
+
+  const addPathMutation = useMutation({
+    mutationFn: (path: string) => adminApi.addModelPath(path),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'model-paths'] })
+      setShowBrowser(false)
     },
   })
 
-  const updatePathMutation = useMutation({
-    mutationFn: (path: string) => adminApi.setModelPath(path),
+  const removePathMutation = useMutation({
+    mutationFn: (path: string) => adminApi.removeModelPath(path),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'model-path'] })
-      setIsEditing(false)
+      queryClient.invalidateQueries({ queryKey: ['admin', 'model-paths'] })
     },
   })
 
@@ -177,51 +178,137 @@ function SettingsTab() {
     return <div className="text-center py-8 text-gray-500">Loading settings...</div>
   }
 
+  const paths = pathsData?.data?.paths || []
+
   return (
     <div className="space-y-6">
       <div className="card p-6">
-        <h2 className="text-lg font-medium mb-4">Model Storage Path</h2>
-        <p className="text-sm text-gray-500 mb-4">
-          Set the path to your 3D model files. This can be a local path or a network share.
-        </p>
-
-        {isEditing ? (
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={modelPath}
-              onChange={(e) => setModelPath(e.target.value)}
-              className="input flex-1"
-              placeholder="/mnt/3d-models or //server/share"
-            />
-            <button
-              onClick={() => updatePathMutation.mutate(modelPath)}
-              disabled={updatePathMutation.isPending}
-              className="btn btn-primary"
-            >
-              <Check className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => {
-                setModelPath(pathData?.data.path || '')
-                setIsEditing(false)
-              }}
-              className="btn btn-secondary"
-            >
-              <X className="w-4 h-4" />
-            </button>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-medium">Model Storage Paths</h2>
+            <p className="text-sm text-gray-500">
+              Configure directories to scan for 3D model files.
+            </p>
           </div>
+          <button onClick={() => setShowBrowser(true)} className="btn btn-primary flex items-center gap-2">
+            <FolderOpen className="w-4 h-4" />
+            Add Path
+          </button>
+        </div>
+
+        {paths.length === 0 ? (
+          <p className="text-gray-400 italic">No paths configured. Click "Add Path" to add a directory.</p>
         ) : (
-          <div className="flex items-center gap-4">
-            <code className="flex-1 p-3 bg-gray-100 dark:bg-gray-700 rounded text-sm">
-              {pathData?.data.path || 'Not set'}
-            </code>
-            <button onClick={() => setIsEditing(true)} className="btn btn-secondary">
-              <Edit2 className="w-4 h-4 mr-1" />
-              Edit
-            </button>
+          <div className="space-y-2">
+            {paths.map((path) => (
+              <div key={path} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <FolderOpen className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                <code className="flex-1 text-sm truncate">{path}</code>
+                <button
+                  onClick={() => {
+                    if (paths.length > 1 || confirm('Remove the last path?')) {
+                      removePathMutation.mutate(path)
+                    }
+                  }}
+                  disabled={removePathMutation.isPending}
+                  className="p-1 text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/30 rounded"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
           </div>
         )}
+      </div>
+
+      {/* Directory Browser Modal */}
+      {showBrowser && (
+        <DirectoryBrowser
+          onSelect={(path) => addPathMutation.mutate(path)}
+          onClose={() => setShowBrowser(false)}
+          isLoading={addPathMutation.isPending}
+        />
+      )}
+    </div>
+  )
+}
+
+function DirectoryBrowser({
+  onSelect,
+  onClose,
+  isLoading,
+}: {
+  onSelect: (path: string) => void
+  onClose: () => void
+  isLoading: boolean
+}) {
+  const [currentPath, setCurrentPath] = useState('/mnt')
+
+  const { data: browseData, isLoading: isBrowsing } = useQuery({
+    queryKey: ['admin', 'browse', currentPath],
+    queryFn: () => adminApi.browseDirectory(currentPath),
+  })
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-medium">Select Directory</h3>
+            <button onClick={onClose} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              onClick={() => browseData?.data?.parent && setCurrentPath(browseData.data.parent)}
+              disabled={!browseData?.data?.parent || browseData.data.parent === currentPath}
+              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded disabled:opacity-50"
+            >
+              <FolderOpen className="w-4 h-4" />
+            </button>
+            <code className="text-sm bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded flex-1 truncate">
+              {currentPath}
+            </code>
+          </div>
+        </div>
+
+        {/* Directory List */}
+        <div className="flex-1 overflow-auto p-2">
+          {isBrowsing ? (
+            <div className="text-center py-8 text-gray-500">Loading...</div>
+          ) : browseData?.data?.directories?.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">No subdirectories</div>
+          ) : (
+            <div className="space-y-1">
+              {browseData?.data?.directories?.map((dir) => (
+                <button
+                  key={dir.path}
+                  onClick={() => setCurrentPath(dir.path)}
+                  className="w-full flex items-center gap-3 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-left"
+                >
+                  <FolderOpen className="w-5 h-5 text-yellow-500" />
+                  <span className="truncate">{dir.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+          <button onClick={onClose} className="btn btn-secondary">
+            Cancel
+          </button>
+          <button
+            onClick={() => onSelect(currentPath)}
+            disabled={isLoading}
+            className="btn btn-primary"
+          >
+            {isLoading ? 'Adding...' : 'Select This Directory'}
+          </button>
+        </div>
       </div>
     </div>
   )

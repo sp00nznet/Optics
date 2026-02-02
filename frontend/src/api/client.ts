@@ -231,6 +231,18 @@ export interface AdminUser {
   created_at: string
 }
 
+// Directory browser types
+export interface DirectoryEntry {
+  name: string
+  path: string
+}
+
+export interface BrowseResult {
+  current: string
+  parent: string
+  directories: DirectoryEntry[]
+}
+
 // Admin API
 export const adminApi = {
   // Settings
@@ -243,6 +255,20 @@ export const adminApi = {
 
   setModelPath: (path: string) =>
     apiClient.put('/admin/settings/model-path', { path }),
+
+  getModelPaths: () => apiClient.get<{ paths: string[] }>('/admin/settings/model-paths'),
+
+  setModelPaths: (paths: string[]) =>
+    apiClient.put('/admin/settings/model-paths', { paths }),
+
+  addModelPath: (path: string) =>
+    apiClient.post<{ paths: string[] }>('/admin/settings/model-paths/add', { path }),
+
+  removeModelPath: (path: string) =>
+    apiClient.post<{ paths: string[] }>('/admin/settings/model-paths/remove', { path }),
+
+  browseDirectory: (path?: string) =>
+    apiClient.get<BrowseResult>('/admin/browse', { params: { path } }),
 
   // User management
   listUsers: () => apiClient.get<AdminUser[]>('/admin/users'),

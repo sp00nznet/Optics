@@ -52,6 +52,10 @@ func NewScanner(db *pgxpool.Pool, scanCfg *config.ScanningConfig, storageCfg *co
 }
 
 func (s *Scanner) Start() {
+	s.StartMultiple([]string{s.storageCfg.MountPath})
+}
+
+func (s *Scanner) StartMultiple(paths []string) {
 	s.mu.Lock()
 	if s.status.Running {
 		s.mu.Unlock()
@@ -65,25 +69,10 @@ func (s *Scanner) Start() {
 	s.categoryCache = make(map[string]uuid.UUID)
 	s.mu.Unlock()
 
-	s.scan()
+	s.scanMultiple(paths)
 }
 
-func (s *Scanner) Stop() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.status.Running {
-		close(s.stopChan)
-		s.status.Running = false
-	}
-}
-
-func (s *Scanner) GetStatus() ScanStatus {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.status
-}
-
-func (s *Scanner) scan() {
+func (s *Scanner) scanMultiple(paths []string) {
 	defer func() {
 		s.mu.Lock()
 		s.status.Running = false
@@ -91,12 +80,22 @@ func (s *Scanner) scan() {
 		s.mu.Unlock()
 	}()
 
-	rootPath := s.storageCfg.MountPath
 	extensions := make(map[string]bool)
 	for _, ext := range s.cfg.Extensions {
 		extensions["."+strings.ToLower(ext)] = true
 	}
 
+	for _, rootPath := range paths {
+		select {
+		case <-s.stopChan:
+			return
+		default:
+		}
+		s.scanPath(rootPath, extensions)
+	}
+}
+
+func (s *Scanner) scanPath(rootPath string, extensions map[string]bool) {
 	err := filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
 		select {
 		case <-s.stopChan:
@@ -178,6 +177,22 @@ func (s *Scanner) scan() {
 		s.incrementError(err.Error())
 	}
 }
+
+func (s *Scanner) Stop() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.status.Running {
+		close(s.stopChan)
+		s.status.Running = false
+	}
+}
+
+func (s *Scanner) GetStatus() ScanStatus {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.status
+}
+
 
 func (s *Scanner) scanZipFile(zipPath, rootPath string, extensions map[string]bool) {
 	reader, err := zip.OpenReader(zipPath)
