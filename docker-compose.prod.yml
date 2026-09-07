@@ -1,7 +1,7 @@
+# Overlay for pointing Optics at a real library instead of ./sample-models:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 services:
   backend:
-    environment:
-      OPTICS_STORAGE_MOUNT_PATH: /mnt/3d-models
     volumes:
-      - /mnt/pool:/mnt/3d-models:ro
+      - ${MODELS_PATH:?set MODELS_PATH to your model directory}:/mnt/3d-models:ro
       - thumbnails_data:/data/thumbnails

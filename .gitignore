@@ -54,6 +54,7 @@ go.work
 # Claude Code
 .claude/
 
-# Test models (local development only)
+# Local scratch model dirs (sample-models/ IS committed)
 models/
 test-models/
+ldraw-convert/

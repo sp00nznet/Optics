@@ -1,0 +1,11 @@
+{
+  "name": "optics-smoke",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "smoke": "node smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}

@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -181,18 +182,5 @@ func (h *AuthHandler) generateToken(userID uuid.UUID, role string) (string, erro
 }
 
 func isUniqueViolation(err error) bool {
-	return err != nil && (contains(err.Error(), "unique") || contains(err.Error(), "duplicate"))
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
-}
-
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	return err != nil && (strings.Contains(err.Error(), "unique") || strings.Contains(err.Error(), "duplicate"))
 }

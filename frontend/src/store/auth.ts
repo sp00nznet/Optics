@@ -67,7 +67,7 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true })
         try {
           const response = await authApi.me()
-          set({ user: response.data, isAuthenticated: true, isLoading: false })
+          set({ user: response.data, token, isAuthenticated: true, isLoading: false })
         } catch {
           localStorage.removeItem('token')
           set({ user: null, token: null, isAuthenticated: false, isLoading: false })
@@ -78,7 +78,13 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      partialize: (state) => ({ token: state.token }),
+      // Persist the whole session, not just the token: without user/isAuthenticated
+      // a refresh renders as logged out and bounces admins off protected routes.
+      partialize: (state) => ({
+        token: state.token,
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+      }),
     }
   )
 )

@@ -2,11 +2,11 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/optics/backend/internal/config"
 	"github.com/optics/backend/internal/handlers"
 	"github.com/optics/backend/internal/middleware"
 	"github.com/optics/backend/internal/services"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func Setup(

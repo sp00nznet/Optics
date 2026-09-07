@@ -1,0 +1,8 @@
+* text=auto eol=lf
+
+# Model fixtures are data - never touch their line endings.
+*.stl binary
+*.3mf binary
+*.obj binary
+*.zip binary
+*.png binary

@@ -37,7 +37,7 @@ services:
       OPTICS_STORAGE_MOUNT_PATH: /mnt/3d-models
       OPTICS_STORAGE_THUMBNAIL_PATH: /data/thumbnails
     volumes:
-      - ./models:/mnt/3d-models:ro
+      - ./sample-models:/mnt/3d-models:ro
       - thumbnails_data:/data/thumbnails
     ports:
       - "${BACKEND_PORT:-8080}:8080"
@@ -49,8 +49,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        API_URL: ${API_URL:-http://localhost:8080}
     container_name: optics-frontend
     restart: unless-stopped
     ports:

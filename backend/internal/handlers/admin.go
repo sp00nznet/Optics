@@ -17,13 +17,14 @@ import (
 )
 
 type AdminHandler struct {
-	db      *pgxpool.Pool
-	cfg     *config.Config
-	scanner *services.Scanner
+	db         *pgxpool.Pool
+	cfg        *config.Config
+	scanner    *services.Scanner
+	duplicates *services.DuplicateDetector
 }
 
 func NewAdminHandler(db *pgxpool.Pool, cfg *config.Config, scanner *services.Scanner) *AdminHandler {
-	return &AdminHandler{db: db, cfg: cfg, scanner: scanner}
+	return &AdminHandler{db: db, cfg: cfg, scanner: scanner, duplicates: services.NewDuplicateDetector(db)}
 }
 
 // Settings Management
@@ -253,8 +254,8 @@ func (h *AdminHandler) BrowseDirectory(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"current": path,
-		"parent":  filepath.Dir(path),
+		"current":     path,
+		"parent":      filepath.Dir(path),
 		"directories": dirs,
 	})
 }
@@ -573,106 +574,21 @@ func (h *AdminHandler) StopScan(c *gin.Context) {
 }
 
 func (h *AdminHandler) DetectDuplicates(c *gin.Context) {
-	go h.detectDuplicates()
+	go h.duplicates.DetectByHash(context.Background())
 	c.JSON(http.StatusAccepted, gin.H{"message": "Duplicate detection started"})
 }
 
-func (h *AdminHandler) detectDuplicates() {
-	ctx := context.Background()
-
-	// Find duplicates by file hash
-	rows, err := h.db.Query(ctx, `
-		SELECT file_hash, array_agg(id) as model_ids
-		FROM models
-		WHERE file_hash IS NOT NULL
-		GROUP BY file_hash
-		HAVING COUNT(*) > 1
-	`)
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var hash string
-		var modelIDs []uuid.UUID
-		if err := rows.Scan(&hash, &modelIDs); err != nil {
-			continue
-		}
-
-		if len(modelIDs) < 2 {
-			continue
-		}
-
-		// Create duplicate group
-		var groupID uuid.UUID
-		err := h.db.QueryRow(ctx,
-			"INSERT INTO duplicate_groups (primary_model_id) VALUES ($1) RETURNING id",
-			modelIDs[0],
-		).Scan(&groupID)
-		if err != nil {
-			continue
-		}
-
-		// Add members
-		for _, modelID := range modelIDs {
-			h.db.Exec(ctx,
-				"INSERT INTO duplicate_members (group_id, model_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-				groupID, modelID,
-			)
-		}
-	}
-}
-
 func (h *AdminHandler) ListDuplicates(c *gin.Context) {
-	rows, err := h.db.Query(
-		context.Background(),
-		`SELECT dg.id, dg.primary_model_id, dg.created_at
-		 FROM duplicate_groups dg
-		 ORDER BY dg.created_at DESC
-		 LIMIT 100`,
-	)
+	groups, _, err := h.duplicates.GetDuplicateGroups(context.Background(), 100, 0)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch duplicates"})
 		return
 	}
-	defer rows.Close()
-
-	var groups []models.DuplicateGroup
-	for rows.Next() {
-		var group models.DuplicateGroup
-		if err := rows.Scan(&group.ID, &group.PrimaryModelID, &group.CreatedAt); err != nil {
-			continue
-		}
-
-		// Get member models
-		memberRows, err := h.db.Query(
-			context.Background(),
-			`SELECT m.id, m.name, m.slug, m.file_path, m.file_type, m.file_size, m.thumbnail_path
-			 FROM models m
-			 JOIN duplicate_members dm ON dm.model_id = m.id
-			 WHERE dm.group_id = $1`,
-			group.ID,
-		)
-		if err == nil {
-			for memberRows.Next() {
-				var m models.Model
-				if memberRows.Scan(&m.ID, &m.Name, &m.Slug, &m.FilePath, &m.FileType, &m.FileSize, &m.ThumbnailPath) == nil {
-					group.Models = append(group.Models, m)
-				}
-			}
-			memberRows.Close()
-		}
-
-		groups = append(groups, group)
-	}
-
 	c.JSON(http.StatusOK, groups)
 }
 
 func (h *AdminHandler) ResolveDuplicate(c *gin.Context) {
-	idStr := c.Param("id")
-	groupID, err := uuid.Parse(idStr)
+	groupID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid group ID"})
 		return
@@ -687,25 +603,7 @@ func (h *AdminHandler) ResolveDuplicate(c *gin.Context) {
 		return
 	}
 
-	ctx := context.Background()
-
-	if req.DeleteOthers {
-		// Delete non-primary models from database (not files)
-		_, err = h.db.Exec(ctx, `
-			DELETE FROM models
-			WHERE id IN (
-				SELECT model_id FROM duplicate_members WHERE group_id = $1
-			) AND id != $2
-		`, groupID, req.PrimaryModelID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete duplicate models"})
-			return
-		}
-	}
-
-	// Delete the duplicate group
-	_, err = h.db.Exec(ctx, "DELETE FROM duplicate_groups WHERE id = $1", groupID)
-	if err != nil {
+	if err := h.duplicates.ResolveDuplicateGroup(context.Background(), groupID, req.PrimaryModelID, req.DeleteOthers); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to resolve duplicate group"})
 		return
 	}

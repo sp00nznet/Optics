@@ -32,7 +32,7 @@ export default function ModelThumbnail({ modelUrl, fileType, className = '' }: M
       }
       setLoading(false)
     })
-  }, [modelUrl, fileType])
+  }, [modelUrl, isSTL])
 
   // For non-STL files, show a placeholder
   if (!isSTL) {

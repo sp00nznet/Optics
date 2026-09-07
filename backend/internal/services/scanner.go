@@ -26,17 +26,17 @@ type SkipReasons struct {
 }
 
 type ScanStatus struct {
-	Running       bool        `json:"running"`
-	StartedAt     time.Time   `json:"started_at,omitempty"`
-	FilesScanned  int         `json:"files_scanned"`
-	FilesIndexed  int         `json:"files_indexed"`
-	FilesSkipped  int         `json:"files_skipped"`
-	SkipReasons   SkipReasons `json:"skip_reasons"`
-	Errors        int         `json:"errors"`
-	ErrorLog      []string    `json:"error_log"`
-	CurrentPath   string      `json:"current_path,omitempty"`
-	LastError     string      `json:"last_error,omitempty"`
-	CompletedAt   time.Time   `json:"completed_at,omitempty"`
+	Running      bool        `json:"running"`
+	StartedAt    time.Time   `json:"started_at,omitempty"`
+	FilesScanned int         `json:"files_scanned"`
+	FilesIndexed int         `json:"files_indexed"`
+	FilesSkipped int         `json:"files_skipped"`
+	SkipReasons  SkipReasons `json:"skip_reasons"`
+	Errors       int         `json:"errors"`
+	ErrorLog     []string    `json:"error_log"`
+	CurrentPath  string      `json:"current_path,omitempty"`
+	LastError    string      `json:"last_error,omitempty"`
+	CompletedAt  time.Time   `json:"completed_at,omitempty"`
 }
 
 type Scanner struct {
@@ -211,7 +211,6 @@ func (s *Scanner) GetStatus() ScanStatus {
 	defer s.mu.RUnlock()
 	return s.status
 }
-
 
 func (s *Scanner) scanZipFile(zipPath, rootPath string, extensions map[string]bool) {
 	reader, err := zip.OpenReader(zipPath)

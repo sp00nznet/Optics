@@ -1,241 +1,123 @@
 # Optics
 
-<div align="center">
+A self-hosted web library for large collections of 3D model files. Point it at a
+directory of STL/SCAD/OBJ files (loose or inside ZIPs), and it indexes, categorises
+and previews them in the browser.
 
-![Optics Logo](https://img.shields.io/badge/Optics-3D%20Model%20Library-blue?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJtMjEuNjQgMy42NC0xLjI4LTEuMjhhMS4yMSAxLjIxIDAgMCAwLTEuNzIgMEwyLjM2IDE4LjY0YTEuMjEgMS4yMSAwIDAgMCAwIDEuNzJsMS4yOCAxLjI4YTEuMiAxLjIgMCAwIDAgMS43MiAwTDIxLjY0IDUuMzZhMS4yIDEuMiAwIDAgMCAwLTEuNzJ6Ii8+PHBhdGggZD0ibTE0IDdsMyAzIi8+PHBhdGggZD0iTTUgNnYxNGMwIDEuMSA5IDEuMSA5IDB2LTE0YzAtMS4xLTktMS4xLTkgMHoiLz48L3N2Zz4=)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+![Go 1.21](https://img.shields.io/badge/Go-1.21-00ADD8?logo=go&logoColor=white)
+![React 18](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)
 
-**A powerful web-based 3D model library manager for browsing, organizing, and managing large collections of STL, SCAD, and other 3D model files.**
+![Browse](docs/screenshots/04-browse.png)
 
-[![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go)](https://golang.org)
-[![React](https://img.shields.io/badge/React-18+-61DAFB?style=flat-square&logo=react)](https://reactjs.org)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat-square&logo=postgresql)](https://postgresql.org)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker)](https://docker.com)
-[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+## Quick start
 
-[Features](#features) | [Quick Start](#quick-start) | [Documentation](#documentation) | [Screenshots](#screenshots)
+Nothing to configure — the repo ships with a small CC0 sample library so a fresh
+clone has something to look at.
 
-</div>
+```bash
+git clone https://github.com/sp00nznet/Optics.git
+cd Optics
+cp .env.example .env          # edit DB_PASSWORD and JWT_SECRET
+docker compose up -d
+```
 
----
+Then open <http://localhost:3333>, register an account (the **first** account
+becomes admin), and hit **Admin → Scanner → Start Scan**. You should end up with
+7 models across 5 categories, one of them indexed from inside a ZIP.
 
-## Overview
+To use your own library instead of the samples, point `MODELS_PATH` at it and add
+the overlay:
 
-Optics is designed to help makers, designers, and 3D printing enthusiasts manage large collections of 3D models. Whether you have a curated collection or a massive Thingiverse archive, Optics makes it easy to browse, search, organize, and preview your models.
+```bash
+MODELS_PATH=/srv/3d-models docker compose \
+  -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
 
-### Key Highlights
+## What it does
 
-- **Interactive 3D Previews** - View STL models directly in your browser with full rotation and zoom
-- **OpenSCAD Integration** - View SCAD source code or convert STL files to OpenSCAD polyhedrons
-- **Smart Organization** - Categories, tags, and collections to keep your library organized
-- **Archive Support** - Scan and serve models from within ZIP files
-- **Duplicate Detection** - Find duplicate files using SHA-256 hashing
-- **Fast Search** - Full-text search across your entire library
+**Browsing and preview.** STL files render as real 3D previews — thumbnails in the
+grid and a full orbit/zoom viewer on the detail page, all client-side via Three.js
+on one shared WebGL context (browsers cap how many you can have).
 
----
+**OpenSCAD panel.** SCAD files show their source. STL files get a generated
+`polyhedron()` you can paste straight into OpenSCAD; OBJ and 3MF get an `import()`
+statement.
 
-## Features
+![Model detail](docs/screenshots/06-model-detail.png)
 
-### 3D Model Viewer
-- **Real-time 3D rendering** using Three.js
-- **STL file support** with proper Z-up to Y-up orientation
-- **Interactive controls** - orbit, zoom, pan
-- **Grid floor** for scale reference
-- **Ambient and directional lighting** for realistic previews
+**Scanning.** Walks the mounted directory, indexes anything with a known extension,
+and looks *inside* ZIP archives — a file in an archive is indexed at
+`archive.zip!path/inside/file.stl` and served straight out of the ZIP, no
+extraction. Top-level folder names become categories. Thing IDs are pulled from
+filenames and bundled `README.txt` files. Re-running a scan is safe; already-indexed
+files are skipped.
 
-### OpenSCAD Code Viewer
-- **Side-by-side layout** with 3D preview and code
-- **STL to OpenSCAD conversion** - generates polyhedron() code from STL geometry
-- **Native SCAD file viewing** with syntax highlighting
-- **One-click copy** to clipboard
-- **Import generation** for OBJ and 3MF files
+**Duplicates.** Groups models by SHA-256 of their contents, so the same mesh loose
+on disk and buried in a ZIP is caught. Detection is idempotent — re-running it
+won't pile up groups.
 
-### Library Management
-- **Automatic scanning** of model directories
-- **ZIP archive support** - index and serve models inside archives
-- **Category auto-creation** from folder structure
-- **Thingiverse metadata parsing** - extracts Thing IDs from filenames and README files
-- **Bulk organization tools**
+![Admin](docs/screenshots/08-admin.png)
 
-### Organization Features
-- **Hierarchical categories** for logical grouping
-- **Colored tags** for flexible labeling
-- **User collections** for personal curation
-- **Favorites** to bookmark frequently used models
+**Admin.** Scan control with live progress and per-extension skip reasons, model
+path management with a directory browser, user management, and library stats.
 
-### Search & Discovery
-- **Full-text search** across model names and descriptions
-- **Filter by category, tags, or file type**
-- **Sort by name, date, or size**
-- **Paginated results** for large libraries
+## Supported files
 
-### Admin Features
-- **Scan management** - trigger and monitor library scans
-- **Duplicate detection** - identify identical files
-- **User management** - first registered user becomes admin
-- **Scan status monitoring** with real-time progress
+| Extension | Preview | OpenSCAD panel |
+|-----------|---------|----------------|
+| `.stl` | 3D viewer + thumbnail | Generated `polyhedron()` |
+| `.scad` | — | Source, as-is |
+| `.obj`, `.3mf` | placeholder | `import()` statement |
+| `.step`, `.stp` | placeholder | — |
+| `.zip` | contents indexed individually | per contained file |
 
-### Thumbnail Generation
-- **Automatic 3D thumbnails** rendered in browser
-- **Shared WebGL context** prevents browser limits
-- **Cached rendering** for performance
-- **Fallback placeholders** for non-STL files
+## Testing
 
----
+One headless script drives the whole stack in a real browser: registers, scans,
+visits every page, asserts each rendered, and writes `docs/screenshots/`. The
+screenshots in this README are its output.
 
-## Quick Start
+```bash
+docker compose up -d
+cd test && npm install && npx playwright install chromium
+npm run smoke
+```
 
-### Prerequisites
-- Docker and Docker Compose
-- 2GB RAM minimum
-- Network access to your model storage (NFS/SMB mount)
+It exits non-zero on a console error, a failed request, a 5xx, a page that
+redirected somewhere unexpected, or a view that never finished rendering.
 
-### Installation
+## Stack
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/sp00nznet/Optics.git
-   cd Optics
-   ```
+Go 1.21 + Gin, PostgreSQL 16, React 18 + TypeScript + Vite, Three.js, Tailwind,
+Zustand + TanStack Query, JWT auth with bcrypt. Migrations run automatically on
+backend start.
 
-2. **Configure environment**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your settings
-   ```
+## Layout
 
-3. **Start the services**
-   ```bash
-   docker compose up -d
-   ```
-
-4. **Access the application**
-   - Frontend: http://localhost:3333
-   - API: http://localhost:8080
-
-5. **Create your account**
-   - Register at http://localhost:3333/register
-   - First user automatically becomes admin
-
-6. **Start scanning**
-   - Go to Admin panel
-   - Click "Start Scan" to index your models
-
-For detailed setup instructions, see [docs/INSTALLATION.md](docs/INSTALLATION.md).
-
----
+```
+backend/            Go API (cmd/server, internal/{config,database,handlers,middleware,models,router,services})
+frontend/           React SPA (src/{api,components,hooks,pages,services,store})
+sample-models/      CC0 models for local runs - see ATTRIBUTION.md
+test/smoke.mjs      Headless end-to-end run + screenshots
+docs/               Installation, configuration, API, architecture, development
+```
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [Installation Guide](docs/INSTALLATION.md) | Detailed setup instructions |
-| [Configuration](docs/CONFIGURATION.md) | Environment variables and options |
-| [API Reference](docs/API.md) | REST API documentation |
-| [Development](docs/DEVELOPMENT.md) | Contributing and local development |
-| [Architecture](docs/ARCHITECTURE.md) | System design and components |
+- [Installation](docs/INSTALLATION.md)
+- [Configuration](docs/CONFIGURATION.md)
+- [API reference](docs/API.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Development](docs/DEVELOPMENT.md)
 
----
+## Sample models
 
-## Screenshots
-
-### Model Browser
-Browse your library with 3D thumbnail previews, category filters, and search.
-
-### Model Detail View
-Side-by-side 3D viewer and OpenSCAD code panel with model metadata.
-
-### Admin Panel
-Manage scans, view statistics, and detect duplicates.
-
----
-
-## Tech Stack
-
-| Component | Technology |
-|-----------|------------|
-| **Backend** | Go 1.21+ with Gin framework |
-| **Frontend** | React 18 + TypeScript + Vite |
-| **Database** | PostgreSQL 16 |
-| **3D Rendering** | Three.js with STLLoader |
-| **Styling** | Tailwind CSS |
-| **State Management** | Zustand + TanStack Query |
-| **Authentication** | JWT with bcrypt |
-| **Containerization** | Docker + Docker Compose |
-
----
-
-## Supported File Types
-
-| Extension | Preview | OpenSCAD Export |
-|-----------|---------|-----------------|
-| `.stl` | 3D Viewer | Polyhedron conversion |
-| `.scad` | Code view | Native display |
-| `.obj` | Placeholder | Import statement |
-| `.3mf` | Placeholder | Import statement |
-| `.step/.stp` | Placeholder | - |
-
----
-
-## Project Structure
-
-```
-Optics/
-├── backend/                 # Go backend
-│   ├── cmd/server/         # Application entry point
-│   └── internal/
-│       ├── config/         # Configuration management
-│       ├── database/       # PostgreSQL connection
-│       ├── handlers/       # HTTP request handlers
-│       ├── middleware/     # Auth middleware
-│       ├── models/         # Data models
-│       ├── router/         # Route definitions
-│       └── services/       # Business logic
-├── frontend/               # React frontend
-│   └── src/
-│       ├── api/           # API client
-│       ├── components/    # React components
-│       ├── hooks/         # Custom hooks
-│       ├── pages/         # Page components
-│       ├── services/      # Frontend services
-│       └── store/         # State management
-├── docs/                   # Documentation
-├── docker-compose.yml      # Container orchestration
-└── .env.example           # Environment template
-```
-
----
-
-## Contributing
-
-Contributions are welcome! Please read [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for guidelines.
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
+`sample-models/` holds six CC0 models mirrored from the Internet Archive's
+Thingiverse collection. Authors and source links are in
+[sample-models/ATTRIBUTION.md](sample-models/ATTRIBUTION.md).
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## Acknowledgments
-
-- [Three.js](https://threejs.org/) for 3D rendering
-- [Gin](https://gin-gonic.com/) for the Go web framework
-- [Tailwind CSS](https://tailwindcss.com/) for styling
-- The 3D printing community for inspiration
-
----
-
-<div align="center">
-
-**Built with love for the maker community**
-
-[Report Bug](https://github.com/sp00nznet/Optics/issues) | [Request Feature](https://github.com/sp00nznet/Optics/issues)
-
-</div>
+MIT — see [LICENSE](LICENSE).

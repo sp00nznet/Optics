@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/auth'
 import Layout from './components/Layout'
@@ -25,6 +26,11 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.React
 }
 
 export default function App() {
+  const checkAuth = useAuthStore((s) => s.checkAuth)
+
+  // Revalidate the persisted session against the server on load.
+  useEffect(() => { checkAuth() }, [checkAuth])
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />

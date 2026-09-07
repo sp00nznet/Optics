@@ -131,7 +131,7 @@ function OverviewTab() {
       )}
 
       {/* Uncategorized Models */}
-      {stats?.data?.uncategorized_count && stats.data.uncategorized_count > 0 && (
+      {(stats?.data?.uncategorized_count ?? 0) > 0 && (
         <div className="card p-6 border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-800">
           <div className="flex items-start gap-4">
             <AlertCircle className="w-6 h-6 text-yellow-600 flex-shrink-0" />
@@ -140,7 +140,7 @@ function OverviewTab() {
                 Uncategorized Models
               </h3>
               <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                {stats.data.uncategorized_count.toLocaleString()} models have not been assigned to a category.
+                {stats?.data?.uncategorized_count?.toLocaleString()} models have not been assigned to a category.
               </p>
             </div>
           </div>

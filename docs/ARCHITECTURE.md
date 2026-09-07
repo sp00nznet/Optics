@@ -33,8 +33,8 @@ This document describes the high-level architecture of Optics.
 │                                 │   │   │                                │  │
 │                                 │   │   │  ┌─────────────────────────┐  │  │
 │                                 │   │   │  │      Services           │  │  │
-│                                 │   │   │  │  Scanner | Indexer      │  │  │
-│                                 │   │   │  │  Duplicates | Thumbnail │  │  │
+│                                 │   │   │  │  Scanner                │  │  │
+│                                 │   │   │  │  Duplicates             │  │  │
 │                                 │   │   │  └─────────────────────────┘  │  │
 │                                 │   │   └────────────────────────────────┘  │
 └─────────────────────────────────┘   └──────────────────────────────────────┘
@@ -43,7 +43,7 @@ This document describes the high-level architecture of Optics.
                                       │                │                │
                                       ▼                ▼                ▼
                             ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-                            │  PostgreSQL  │  │   NFS Mount  │  │  Thumbnails  │
+                            │  PostgreSQL  │  │  Model Mount │  │  Thumbnails  │
                             │   Database   │  │  (3D Models) │  │    Cache     │
                             │              │  │              │  │              │
                             │  - users     │  │  /mnt/       │  │  /data/      │
@@ -85,16 +85,21 @@ Built with Go and the Gin web framework.
 |-------|----------------|
 | **Handlers** | HTTP request/response handling |
 | **Middleware** | Authentication, CORS, logging |
-| **Services** | Business logic (scanning, indexing) |
+| **Services** | Business logic (scanning, duplicate detection) |
 | **Models** | Data structures and database queries |
 | **Config** | Environment configuration |
 
 #### Services
 
-- **Scanner**: Walks filesystem, indexes new files, handles ZIP archives
-- **Indexer**: Creates database records for discovered models
-- **Duplicates**: Detects duplicate files using SHA-256 hashes
-- **Thumbnail**: (Future) Server-side thumbnail generation
+- **Scanner**: Walks the mounted directory, indexes new files, reads inside ZIP
+  archives, and creates categories from top-level folder names
+- **Duplicates**: Groups models by SHA-256 of their contents; idempotent, so
+  re-running detection does not create duplicate groups
+
+Thumbnails have no server-side service - they are rendered in the browser (see
+`frontend/src/services/thumbnailService.ts`). The `thumbnail_path` column and
+`/api/models/:id/thumbnail` endpoint exist for pre-rendered files but nothing
+writes them today.
 
 ### Database Schema
 
