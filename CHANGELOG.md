@@ -3,7 +3,9 @@
 All notable changes, newest first. Format: [Keep a Changelog](https://keepachangelog.com/),
 versions: [SemVer](https://semver.org/).
 
-## [Unreleased] (to be tagged v0.1.0)
+## [Unreleased]
+
+## [0.1.0] - 2026-10-15
 
 
 A rewrite: Optics is now a native Windows program instead of a self-hosted web app.
@@ -26,3 +28,6 @@ A rewrite: Optics is now a native Windows program instead of a self-hosted web a
 ### Removed
 - The Go backend, React frontend, PostgreSQL, Docker files, user accounts and admin.
 - Duplicate detection and tags (ROADMAP.md says which are coming back).
+
+[Unreleased]: https://github.com/sp00nznet/Optics/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/sp00nznet/Optics/releases/tag/v0.1.0
