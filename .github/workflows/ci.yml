@@ -4,7 +4,7 @@ name: build
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
     tags: ['v*']
   pull_request:
   workflow_dispatch:
@@ -40,7 +40,7 @@ jobs:
       - name: Headless render
         run: .\build\bin\optics-check.exe --render sample-models/Textured/crate.fbx build/crate.png 640x480
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: optics-windows-x64
           path: |
