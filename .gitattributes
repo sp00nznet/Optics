@@ -6,3 +6,7 @@
 *.obj binary
 *.zip binary
 *.png binary
+*.fbx binary
+*.mtl binary
+*.ico binary
+*.cmd text eol=crlf
