@@ -1,0 +1,12 @@
+Optics includes third-party code. Each file keeps its own header; the full
+licence texts are in LICENSES/.
+
+| Path                               | Upstream                              | Version                 | Licence                       |
+|------------------------------------|---------------------------------------|-------------------------|-------------------------------|
+| third_party/ufbx/ufbx.c, ufbx.h    | https://github.com/ufbx/ufbx          | v0.23.1                 | MIT or Unlicense (MIT taken)  |
+| third_party/stb/stb_image.h        | https://github.com/nothings/stb       | v2.30 (2c980bb)         | MIT or public domain (MIT taken) |
+| third_party/stb/stb_image_write.h  | https://github.com/nothings/stb       | v1.16 (2c980bb)         | MIT or public domain (MIT taken) |
+
+src/inflate.c and src/inflate.h come from OpenNote
+(https://github.com/sp00nznet/opennote, src/core/inflate.c at 9c2f1f6), by the
+same author under the same MIT licence as this repository.

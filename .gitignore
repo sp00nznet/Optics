@@ -1,60 +1,36 @@
-# Dependencies
-node_modules/
-vendor/
-
-# Build outputs
-dist/
+# Build output
 build/
+dist/
 *.exe
-*.dll
-*.so
-*.dylib
+*.obj.tmp
+*.pdb
+*.ilk
 
-# Environment files
-.env
-.env.local
-.env.*.local
+# Setup.cmd's log and the shortcut it makes
+setup.log
+Optics.lnk
 
-# IDE
-.idea/
+# Editors and OS
+.vs/
 .vscode/
+.idea/
 *.swp
-*.swo
 *~
-
-# OS files
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
-logs/
-
-# Test coverage
-coverage/
-*.cover
-*.out
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-
-# Database files
-*.db
-*.sqlite
-
-# Generated thumbnails (in production these are in Docker volume)
-thumbnails/
-
-# Go
-*.test
-go.work
-
-# Claude Code
+# Never committed (repo rules section 2; also in the global excludes file)
+.env
+.env.*
+CLAUDE.md
 .claude/
 
-# Local scratch model dirs (sample-models/ IS committed)
+# Local model libraries and leftovers from the old web app (not part of the repo)
 models/
 test-models/
 ldraw-convert/
+backend/
+frontend/
+test/
+# netlab drops its local-builder output here
+build-farm/
